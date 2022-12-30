@@ -13,6 +13,20 @@ using StereoKit;
 
 namespace VisualScript
 {
+
+	public delegate void CallVoidARG<T, A1, A2>(ref T arg1, A1 arg2, A2 arg3);
+	public delegate T2 CallARG<T, T2, A1, A2>(ref T arg1, A1 arg2, A2 arg3);
+	public delegate T2 CallARGR<T2, A1, A2>(A1 arg2, A2 arg3);
+
+	public delegate void CallVoidARG<T, A1>(ref T arg1,A1 arg2);
+	public delegate T2 CallARG<T, T2, A1>(ref T arg1, A1 arg2);
+	public delegate T2 CallARGR<T2,A1>(A1 arg2);
+
+	public delegate void CallVoid<T>(ref T arg1);
+	public delegate T2 Call<T,T2>(ref T arg1);
+	public delegate T2 CallR<T2>();
+	public delegate ref T GetRef<T>();
+
 	public static class Helper
 	{
 

@@ -25,7 +25,7 @@ public sealed class ScriptEditor
 		_player = player;
 		UIPos = new Pose(new Vec3(0, 0.25f, -0.5f), Quat.LookAt(Vec3.Forward, Vec3.Zero));
 		_targetReadType = typeof(string);
-		SpawnNodeType = BuildSpawnNodeType(typeof(Const<string>));
+		SpawnNodeType = BuildSpawnNodeType(typeof(Variable<string>));
 		ReBuildUI();
 	}
 
@@ -86,6 +86,10 @@ public sealed class ScriptEditor
 			spawnNodeType = BuildSpawnNodeType(typeof(TriggerButton))
 		});
 		_elements.Add(new UIElement {
+			name = "Update",
+			spawnNodeType = BuildSpawnNodeType(typeof(UpdateNode))
+		});
+		_elements.Add(new UIElement {
 			name = "Display",
 			spawnNodeType = BuildSpawnNodeType(typeof(DisplayNode<string>))
 		});
@@ -107,8 +111,26 @@ public sealed class ScriptEditor
 						if (item.GetParameters().Length == 0) {
 							try {
 								_elements.Add(new UIElement {
-									name = item.Name + "()",
-									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodVoid<>).MakeGenericType(TypeTargetReadType)), item.Name)
+									name = "void " + item.Name + "()",
+									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodVoid<>).MakeGenericType(item.DeclaringType)), item.Name)
+								});
+							}
+							catch { }
+						}
+						else if (item.GetParameters().Length == 1) {
+							try {
+								_elements.Add(new UIElement {
+									name = "void " + item.Name + "(" + item.GetParameters()[0].ParameterType.GetFormattedName() + " " + item.GetParameters()[0].Name + ")",
+									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodVoidARG<,>).MakeGenericType(item.DeclaringType, item.GetParameters()[0].ParameterType)), item.Name)
+								});
+							}
+							catch { }
+						}
+						else if (item.GetParameters().Length == 2) {
+							try {
+								_elements.Add(new UIElement {
+									name = "void " + item.Name + "(" + item.GetParameters()[0].ParameterType.GetFormattedName() + " " + item.GetParameters()[0].Name + "," + item.GetParameters()[1].ParameterType.GetFormattedName() + " " + item.GetParameters()[1].Name + ")",
+									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodVoidARG<,,>).MakeGenericType(item.DeclaringType, item.GetParameters()[0].ParameterType, item.GetParameters()[1].ParameterType)), item.Name)
 								});
 							}
 							catch { }
@@ -121,8 +143,26 @@ public sealed class ScriptEditor
 						if (item.GetParameters().Length == 0) {
 							try {
 								_elements.Add(new UIElement {
-									name = item.Name + "()",
-									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodOut<,>).MakeGenericType(TypeTargetReadType, item.ReturnParameter.ParameterType)), item.Name)
+									name = item.ReturnParameter.ParameterType.GetFormattedName() + " " + item.Name + "()",
+									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodOut<,>).MakeGenericType(item.DeclaringType, item.ReturnParameter.ParameterType)), item.Name)
+								});
+							}
+							catch { }
+						}
+						else if (item.GetParameters().Length == 1) {
+							try {
+								_elements.Add(new UIElement {
+									name = item.ReturnParameter.ParameterType.GetFormattedName() + " " + item.Name + "(" + item.GetParameters()[0].ParameterType.GetFormattedName() + " " + item.GetParameters()[0].Name + ")",
+									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodOutARG<,,>).MakeGenericType(item.DeclaringType, item.ReturnParameter.ParameterType, item.GetParameters()[0].ParameterType)), item.Name)
+								});
+							}
+							catch { }
+						}
+						else if (item.GetParameters().Length == 2) {
+							try {
+								_elements.Add(new UIElement {
+									name = item.ReturnParameter.ParameterType.GetFormattedName() + " " + item.Name + "(" + item.GetParameters()[0].ParameterType.GetFormattedName() + " " + item.GetParameters()[0].Name + "," + item.GetParameters()[1].ParameterType.GetFormattedName() + " " + item.GetParameters()[1].Name + ")",
+									spawnNodeType = BuildSpawnNodeType((typeof(CallMethodOutARG<,,,>).MakeGenericType(item.DeclaringType, item.ReturnParameter.ParameterType, item.GetParameters()[0].ParameterType, item.GetParameters()[1].ParameterType)), item.Name)
 								});
 							}
 							catch { }
@@ -140,7 +180,7 @@ public sealed class ScriptEditor
 					try {
 						_elements.Add(new UIElement {
 							name = "Get " + prop.Name,
-							spawnNodeType = BuildSpawnNodeType((typeof(GetProperty<,>).MakeGenericType(TypeTargetReadType, prop.PropertyType)), prop.Name)
+							spawnNodeType = BuildSpawnNodeType((typeof(GetProperty<,>).MakeGenericType(prop.DeclaringType, prop.PropertyType)), prop.Name)
 						});
 					}
 					catch { }
@@ -149,7 +189,7 @@ public sealed class ScriptEditor
 					try {
 						_elements.Add(new UIElement {
 							name = "Set " + prop.Name,
-							spawnNodeType = BuildSpawnNodeType((typeof(SetProperty<,>).MakeGenericType(TypeTargetReadType, prop.PropertyType)), prop.Name)
+							spawnNodeType = BuildSpawnNodeType((typeof(SetProperty<,>).MakeGenericType(prop.DeclaringType, prop.PropertyType)), prop.Name)
 						});
 					}
 					catch { }
@@ -160,25 +200,31 @@ public sealed class ScriptEditor
 			typeof(UIElement).Assembly,
 			typeof(Color).Assembly,
 		};
-		var systemTypes = new Type[] { typeof(string), typeof(Type), typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong) };
+		var systemTypes = new Type[] { typeof(string), typeof(Type), typeof(bool), typeof(float), typeof(Half), typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint), typeof(long), typeof(ulong) };
 		foreach (var item in systemTypes) {
 			_elements.Add(new UIElement {
-				name = "Const " + item.GetFormattedName(),
-				spawnNodeType = BuildSpawnNodeType(typeof(Const<>).MakeGenericType(item))
+				name = "Variable " + item.GetFormattedName(),
+				spawnNodeType = BuildSpawnNodeType(typeof(Variable<>).MakeGenericType(item))
 			});
 		}
 		var staticTypes = from asm in asemb
 						  from t in asm.GetTypes()
 						  where t.IsPublic
-						  where !t.IsAbstract
 						  where !t.IsGenericType
-						  where t.GetMethods(BindingFlags.Static | BindingFlags.Public).Length >= 0
 						  select t;
 		foreach (var item in staticTypes) {
-			_elements.Add(new UIElement {
-				name = "Const " + item.GetFormattedName(),
-				spawnNodeType = BuildSpawnNodeType(typeof(Const<>).MakeGenericType(item))
-			});
+			try {
+				_elements.Add(new UIElement {
+					name = "Variable " + item.GetFormattedName(),
+					spawnNodeType = BuildSpawnNodeType(typeof(Variable<>).MakeGenericType(item))
+				});
+			}
+			catch {
+				_elements.Add(new UIElement {
+					name = "Static " + item.GetFormattedName(),
+					spawnNodeType = BuildSpawnNodeType(typeof(StaticVariable), item.FullName)
+				});
+			}
 		}
 	}
 

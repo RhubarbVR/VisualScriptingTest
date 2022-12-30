@@ -9,9 +9,9 @@ using StereoKit;
 
 namespace VisualScript
 {
-	public sealed class CallMethodVoid<T> : NodeBase
+	public sealed class CallMethodVoidARG<T, A1> : NodeBase
 	{
-		private CallVoid<T> _propertyInfo;
+		private CallVoidARG<T, A1> _propertyInfo;
 		private string _targetMethod;
 
 		public string TargetMethod
@@ -20,22 +20,24 @@ namespace VisualScript
 			set {
 				_targetMethod = value;
 				var target = from p in typeof(T).GetMethods(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public)
-							 where p.GetParameters().Length == 0
+							 where p.GetParameters().Length == 1
+							 where p.GetParameters()[0].ParameterType == typeof(A1)
 							 where p.ReturnParameter.ParameterType == typeof(void)
 							 where p.Name == _targetMethod
 							 select p;
+				nodeInputs[2].Name = target.FirstOrDefault()?.GetParameters()[0].Name;
 				try {
 					try {
-						_propertyInfo = (CallVoid<T>)target.FirstOrDefault().CreateDelegate(typeof(CallVoid<T>));
+						_propertyInfo = (CallVoidARG<T, A1>)target.FirstOrDefault().CreateDelegate(typeof(CallVoidARG<T, A1>));
 					}
 					catch {
-						var temp = ((Action<T>)target.FirstOrDefault().CreateDelegate(typeof(Action<T>)));
-						_propertyInfo = (ref T a) => temp(a);
+						var temp = ((Action<T, A1>)target.FirstOrDefault().CreateDelegate(typeof(Action<T, A1>)));
+						_propertyInfo = (ref T a, A1 b) => temp(a, b);
 					}
 				}
 				catch {
-					var temp = (Action)target.FirstOrDefault()?.CreateDelegate(typeof(Action));
-					_propertyInfo = (ref T a) => temp();
+					var temp = (Action<A1>)target.FirstOrDefault()?.CreateDelegate(typeof(Action<A1>));
+					_propertyInfo = (ref T a, A1 b) => temp(b);
 				}
 			}
 		}
@@ -51,16 +53,20 @@ namespace VisualScript
 				Name = "Target",
 				ButtonType = typeof(T),
 			});
+			nodeInputs.Add(new NodeInput(this) {
+				Name = "Arg1",
+				ButtonType = typeof(A1),
+			});
 		}
 
 
 
 		public override void RenderUI() {
-			UI.Text(TargetMethod + "()", TextAlign.Center);
+			UI.Text(TargetMethod + "(" + typeof(A1).GetFormattedName() + " " + nodeInputs[2].Name + ")", TextAlign.Center);
 		}
 
 		protected override void Invoke() {
-			_propertyInfo?.Invoke(ref nodeInputs[1].GetValue<T>());
+			_propertyInfo?.Invoke(ref nodeInputs[1].GetValue<T>(), nodeInputs[2].GetValue<A1>());
 		}
 	}
 }

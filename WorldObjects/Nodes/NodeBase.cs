@@ -74,7 +74,7 @@ namespace VisualScript
 						_connectedTo.OnDispos -= Clear;
 					}
 					_connectedTo = value;
-					if(value is null) {
+					if (value is null) {
 						return;
 					}
 					if (value.ConnectedTo != this) {
@@ -100,6 +100,8 @@ namespace VisualScript
 
 		public abstract class NodeOutputBase : NodeButton
 		{
+			public abstract T CastToData<T>();
+
 			public NodeOutputBase(NodeBase app) {
 				_node = app;
 			}
@@ -142,16 +144,19 @@ namespace VisualScript
 			}
 
 			protected override bool AllowConnect(NodeButton nodeButton) {
-				if(nodeButton is null) {
+				if (nodeButton is null) {
 					return true;
 				}
 				if (nodeButton.Flow != Flow) {
 					return false;
 				}
-				if (nodeButton.ButtonType != ButtonType) {
+				if (typeof(NodeOutput<>).IsAssignableFrom(nodeButton.GetType())) {
 					return false;
 				}
-				if (typeof(NodeOutput<>).IsAssignableFrom(nodeButton.GetType())) {
+				if (nodeButton.ButtonType != ButtonType) {
+					if (nodeButton.ButtonType.IsAssignableFrom(ButtonType)) {
+						return true;
+					}
 					return false;
 				}
 				return true;
@@ -162,13 +167,41 @@ namespace VisualScript
 			}
 		}
 
+		internal static class VoidRefer<T>
+		{
+			private static T _value = default;
+
+			public static ref T GetRef() {
+				_value = default;
+				return ref _value;
+			}
+
+		}
+
 		public sealed class NodeOutput<T> : NodeOutputBase
 		{
 			public NodeOutput(NodeBase app) : base(app) {
 			}
 
-			public T Value { get; set; }
+			public GetRef<T> GetValue;
 
+			public ref T GetRef() {
+				return ref GetValue is null ? ref VoidRefer<T>.GetRef() : ref GetValue();
+			}
+
+			public override T1 CastToData<T1>() {
+				var data = GetRef();
+				return (T1)(object)data;
+			}
+		}
+
+		public sealed class ValueHolder<T>
+		{
+			public T Value;
+
+			public ValueHolder(T val) {
+				Value = val;
+			}
 		}
 
 		public sealed class NodeInput : NodeButton
@@ -179,8 +212,14 @@ namespace VisualScript
 
 			public bool TargetNodeHasFlow => ConnectedTo?.NodeHasFlow ?? true;
 
-			public T GetValue<T>() {
-				return ConnectedTo is NodeOutput<T> value ? value.Value : default;
+			public ref T GetValue<T>() {
+				if(ConnectedTo is NodeOutput<T> value) {
+					return ref value.GetRef();
+				}
+				if(ConnectedTo is NodeOutputBase nodeValue) {
+					return ref new ValueHolder<T>(nodeValue.CastToData<T>()).Value;
+				}
+				return ref VoidRefer<T>.GetRef();
 			}
 
 			protected override bool AllowConnect(NodeButton nodeButton) {
@@ -190,10 +229,13 @@ namespace VisualScript
 				if (nodeButton.Flow != Flow) {
 					return false;
 				}
-				if (nodeButton.ButtonType != ButtonType) {
+				if (typeof(NodeInput) == nodeButton.GetType()) {
 					return false;
 				}
-				if (typeof(NodeInput) == nodeButton.GetType()) {
+				if (nodeButton.ButtonType != ButtonType) {
+					if (nodeButton.ButtonType.IsAssignableTo(ButtonType)) {
+						return true;
+					}
 					return false;
 				}
 				return true;
@@ -205,7 +247,7 @@ namespace VisualScript
 				var location = new Vec3(0.1f + 0.04f, -yPos * 0.05f, 0);
 				lastPos = (Matrix.T(location) * _node.Pos.ToMatrix()).Translation;
 				if (ConnectedTo is NodeOutputBase node) {
-					Lines.Add(location + new Vec3(-0.04f, -0.04f, 0) / 2, (Matrix.T(node.lastPos + new Vec3(0.04f, -0.04f, 0) / 2) * _node.Pos.ToMatrix().Inverse).Translation, color, 0.01f);
+					Lines.Add(location + new Vec3(-0.04f, -0.04f, 0) / 2, (Matrix.T(node.lastPos + new Vec3(0.04f, -0.04f, 0) / 2) * _node.Pos.ToMatrix().Inverse).Translation, color, node.ButtonType.GetTypeColor(), 0.01f);
 				}
 				if (UI.ButtonAt("", location, new Vec2(0.04f))) {
 					if (_node.App.Player.scriptEditor.NodeButton == this) {
@@ -221,7 +263,7 @@ namespace VisualScript
 						}
 						else {
 							if (Flow) {
-								if(_node.App.Player.scriptEditor.NodeButton.ConnectedTo?.ConnectedTo is not null) {
+								if (_node.App.Player.scriptEditor.NodeButton.ConnectedTo?.ConnectedTo is not null) {
 									_node.App.Player.scriptEditor.NodeButton.ConnectedTo.ConnectedTo = null;
 								}
 							}

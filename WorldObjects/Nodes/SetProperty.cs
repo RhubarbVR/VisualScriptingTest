@@ -11,7 +11,7 @@ namespace VisualScript
 {
 	public sealed class SetProperty<T, T2> : NodeBase
 	{
-		private Action<T, T2> _propertyInfo;
+		private CallVoidARG<T, T2> _propertyInfo;
 		private string _targetPram;
 
 		public string TargetPram
@@ -22,13 +22,20 @@ namespace VisualScript
 				var target = from p in typeof(T).GetProperties(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public)
 							 where p.PropertyType == typeof(T2)
 							 where p.CanWrite
+							 where p.Name == _targetPram
 							 select p;
 				try {
-					_propertyInfo = (Action<T, T2>)target.FirstOrDefault()?.GetSetMethod()?.CreateDelegate(typeof(Action<T, T2>));
+					try {
+						_propertyInfo = (CallVoidARG<T, T2>)target.FirstOrDefault()?.GetSetMethod()?.CreateDelegate(typeof(CallVoidARG<T, T2>));
+					}
+					catch {
+						var temp = (Action<T, T2>)target.FirstOrDefault()?.GetSetMethod()?.CreateDelegate(typeof(Action<T, T2>));
+						_propertyInfo = (ref T a, T2 b) => temp(a, b);
+					}
 				}
 				catch {
 					var temp = ((Action<T2>)target.FirstOrDefault()?.GetSetMethod()?.CreateDelegate(typeof(Action<T2>)));
-					_propertyInfo = (T a, T2 b) => temp(b);
+					_propertyInfo = (ref T a, T2 b) => temp(b);
 				}
 			}
 		}
@@ -46,7 +53,7 @@ namespace VisualScript
 			});
 			nodeInputs.Add(new NodeInput(this) {
 				Name = "Value",
-				ButtonType = typeof(T),
+				ButtonType = typeof(T2),
 			});
 		}
 
@@ -57,7 +64,7 @@ namespace VisualScript
 		}
 
 		protected override void Invoke() {
-			_propertyInfo?.Invoke(nodeInputs[1].GetValue<T>(), nodeInputs[2].GetValue<T2>());
+			_propertyInfo?.Invoke(ref nodeInputs[1].GetValue<T>(), nodeInputs[2].GetValue<T2>());
 		}
 	}
 }

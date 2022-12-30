@@ -7,14 +7,12 @@ using StereoKit;
 
 namespace VisualScript
 {
-	public sealed class Const<T> : NodeBase
+	public sealed class Variable<T> : NodeBase
 	{
-		protected override void Invoke() {
-			var outPut = GetNodeOutput<T>(1);
-			if(outPut is not null) {
-				outPut.Value = _value;
-			}
-		}
+		public override bool IsInputEvent => true;
+		public override bool IsOutputEvent => true;
+
+		protected override void Invoke() { }
 
 		private T _value = default;
 
@@ -34,6 +32,7 @@ namespace VisualScript
 			nodeOutputs.Add(new NodeOutput<T>(this) {
 				Name = "value",
 				ButtonType = typeof(T),
+				GetValue = () => ref _value
 			});
 			_rep = Value?.ToString();
 		}

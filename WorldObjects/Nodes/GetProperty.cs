@@ -13,7 +13,7 @@ namespace VisualScript
 	{
 		private string _targetPram;
 
-		private Func<T, T2> _propertyInfo;
+		private Call<T, T2> _propertyInfo;
 
 		public string TargetPram
 		{
@@ -22,14 +22,21 @@ namespace VisualScript
 				_targetPram = value;
 				var target = from p in typeof(T).GetProperties(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public)
 							 where p.PropertyType == typeof(T2)
+							 where p.Name == _targetPram
 							 where p.CanRead
 							 select p;
 				try {
-					_propertyInfo = (Func<T, T2>)target.FirstOrDefault()?.GetGetMethod()?.CreateDelegate(typeof(Func<T, T2>));
+					try{
+						_propertyInfo = (Call<T, T2>)target.FirstOrDefault()?.GetGetMethod()?.CreateDelegate(typeof(Call<T, T2>));
+					}
+					catch {
+						var temp = ((Func<T, T2>)target.FirstOrDefault()?.GetGetMethod()?.CreateDelegate(typeof(Func<T, T2>)));
+						_propertyInfo = (ref T a) => temp(a);
+					}
 				}
 				catch {
 					var temp = ((Func<T2>)target.FirstOrDefault()?.GetGetMethod()?.CreateDelegate(typeof(Func<T2>)));
-					_propertyInfo = (T a) => temp();
+					_propertyInfo = (ref T a) => temp();
 				}
 			}
 		}
@@ -43,6 +50,7 @@ namespace VisualScript
 			nodeOutputs.Add(new NodeOutput<T2>(this) {
 				Name = "Value",
 				ButtonType = typeof(T2),
+				GetValue = () => ref _output
 			});
 			nodeInputs.Add(new NodeInput(this) {
 				Name = "Target",
@@ -55,15 +63,11 @@ namespace VisualScript
 		public override void RenderUI() {
 			UI.Text("Get " + TargetPram, TextAlign.Center);
 		}
-
+		private T2 _output;
 		protected override void Invoke() {
-			var outPut = GetNodeOutput<T2>(1);
-			T2 e = default;
+			_output = default;
 			if (_propertyInfo is not null) {
-				e = _propertyInfo.Invoke(nodeInputs[1].GetValue<T>());
-			}
-			if (outPut is not null) {
-				outPut.Value = e;
+				_output = _propertyInfo.Invoke(ref nodeInputs[1].GetValue<T>());
 			}
 		}
 	}
